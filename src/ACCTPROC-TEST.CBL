@@ -1,0 +1,77 @@
+*> ACCTPROC-TEST.CBL
+      *> Self-contained test version — sample data built in, prints to
+      *> screen. No files, no setup, just paste and run.
+      >>SOURCE FORMAT FREE
+
+IDENTIFICATION DIVISION.
+PROGRAM-ID. ACCTPROCTEST.
+AUTHOR. NEEL-PATEL.
+
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+
+01  WS-NUM-ACCOUNTS      PIC 9 VALUE 3.
+01  WS-INDEX             PIC 9.
+
+01  ACCOUNT-TABLE.
+    05  ACCOUNT-ENTRY OCCURS 3 TIMES.
+        10  T-ACCT-ID     PIC 9(6).
+        10  T-ACCT-NAME   PIC X(20).
+        10  T-ACCT-BALANCE PIC 9(7)V99.
+        10  T-ACCT-RATE   PIC 9V999.
+
+01  WS-INTEREST          PIC 9(7)V99 VALUE 0.
+01  WS-NEW-BALANCE       PIC 9(7)V99 VALUE 0.
+01  WS-TOTAL-INTEREST    PIC 9(9)V99 VALUE 0.
+
+01  WS-BALANCE-DISP      PIC $$$,$$$,$$9.99.
+01  WS-INTEREST-DISP     PIC $$$,$$$,$$9.99.
+01  WS-TOTAL-DISP        PIC $$,$$$,$$$,$$9.99.
+
+PROCEDURE DIVISION.
+MAIN-LOGIC.
+    MOVE 100001            TO T-ACCT-ID(1)
+    MOVE "JOHN SMITH"       TO T-ACCT-NAME(1)
+    MOVE 10500.00           TO T-ACCT-BALANCE(1)
+    MOVE 0.045               TO T-ACCT-RATE(1)
+
+    MOVE 100002            TO T-ACCT-ID(2)
+    MOVE "MARY JONES"       TO T-ACCT-NAME(2)
+    MOVE 25750.50           TO T-ACCT-BALANCE(2)
+    MOVE 0.038               TO T-ACCT-RATE(2)
+
+    MOVE 100003            TO T-ACCT-ID(3)
+    MOVE "ALEX CHEN"        TO T-ACCT-NAME(3)
+    MOVE 5000.00             TO T-ACCT-BALANCE(3)
+    MOVE 0.052               TO T-ACCT-RATE(3)
+
+    DISPLAY "=== Monthly Interest Batch Report ==="
+    DISPLAY " "
+
+    PERFORM VARYING WS-INDEX FROM 1 BY 1
+        UNTIL WS-INDEX > WS-NUM-ACCOUNTS
+
+        COMPUTE WS-INTEREST ROUNDED =
+            (T-ACCT-BALANCE(WS-INDEX) * T-ACCT-RATE(WS-INDEX)) / 12
+
+        COMPUTE WS-NEW-BALANCE =
+            T-ACCT-BALANCE(WS-INDEX) + WS-INTEREST
+
+        ADD WS-INTEREST TO WS-TOTAL-INTEREST
+
+        MOVE WS-NEW-BALANCE TO WS-BALANCE-DISP
+        MOVE WS-INTEREST    TO WS-INTEREST-DISP
+
+        DISPLAY "Account " T-ACCT-ID(WS-INDEX)
+            " (" T-ACCT-NAME(WS-INDEX) ")"
+        DISPLAY "  Interest: " WS-INTEREST-DISP
+        DISPLAY "  New balance: " WS-BALANCE-DISP
+        DISPLAY " "
+
+    END-PERFORM
+
+    MOVE WS-TOTAL-INTEREST TO WS-TOTAL-DISP
+    DISPLAY "Total accounts processed: " WS-NUM-ACCOUNTS
+    DISPLAY "Total interest paid out:  " WS-TOTAL-DISP
+
+    STOP RUN.
