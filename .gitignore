@@ -1,0 +1,5 @@
+acctproc
+*.o
+UPDATED.DAT
+REPORT.TXT
+src/ACCOUNTS.DAT
