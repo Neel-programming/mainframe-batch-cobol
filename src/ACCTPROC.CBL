@@ -1,0 +1,140 @@
+*> ACCTPROC.CBL
+      *> Reads a fixed-width account file (standing in for an extract
+      *> from a DB2 table, which is how mainframe COBOL batch jobs
+      *> typically get their data), calculates one month of interest
+      *> per account, writes an updated account file, and produces a
+      *> summary report. This is the kind of batch job that runs
+      *> overnight on a bank's mainframe to update balances before the
+      *> next business day.
+      >>SOURCE FORMAT FREE
+
+IDENTIFICATION DIVISION.
+PROGRAM-ID. ACCTPROC.
+AUTHOR. NEEL-PATEL.
+
+ENVIRONMENT DIVISION.
+INPUT-OUTPUT SECTION.
+FILE-CONTROL.
+    SELECT ACCOUNT-FILE ASSIGN TO "ACCOUNTS.DAT"
+        ORGANIZATION IS LINE SEQUENTIAL.
+    SELECT UPDATED-FILE ASSIGN TO "UPDATED.DAT"
+        ORGANIZATION IS LINE SEQUENTIAL.
+    SELECT REPORT-FILE ASSIGN TO "REPORT.TXT"
+        ORGANIZATION IS LINE SEQUENTIAL.
+
+DATA DIVISION.
+FILE SECTION.
+
+FD  ACCOUNT-FILE.
+01  ACCOUNT-RECORD.
+    05  ACCT-ID          PIC 9(6).
+    05  ACCT-NAME        PIC X(20).
+    05  ACCT-BALANCE     PIC 9(7)V99.
+    05  ACCT-RATE        PIC 9V999.
+
+FD  UPDATED-FILE.
+01  UPDATED-RECORD       PIC X(80).
+
+FD  REPORT-FILE.
+01  REPORT-LINE          PIC X(80).
+
+WORKING-STORAGE SECTION.
+01  WS-EOF               PIC X       VALUE "N".
+01  WS-INTEREST          PIC 9(7)V99 VALUE 0.
+01  WS-NEW-BALANCE       PIC 9(7)V99 VALUE 0.
+01  WS-TOTAL-INTEREST    PIC 9(9)V99 VALUE 0.
+01  WS-ACCOUNT-COUNT     PIC 9(5)    VALUE 0.
+
+01  WS-BALANCE-DISP      PIC $$$,$$$,$$9.99.
+01  WS-INTEREST-DISP     PIC $$$,$$$,$$9.99.
+01  WS-TOTAL-DISP        PIC $$,$$$,$$$,$$9.99.
+01  WS-COUNT-DISP        PIC ZZZZ9.
+
+01  WS-OUTPUT-LINE       PIC X(80).
+01  WS-REPORT-LINE       PIC X(80).
+
+PROCEDURE DIVISION.
+MAIN-LOGIC.
+    OPEN INPUT  ACCOUNT-FILE
+    OPEN OUTPUT UPDATED-FILE
+    OPEN OUTPUT REPORT-FILE
+
+    PERFORM WRITE-REPORT-HEADER
+
+    PERFORM UNTIL WS-EOF = "Y"
+        READ ACCOUNT-FILE
+            AT END
+                MOVE "Y" TO WS-EOF
+            NOT AT END
+                PERFORM PROCESS-ACCOUNT
+        END-READ
+    END-PERFORM
+
+    PERFORM WRITE-REPORT-FOOTER
+
+    CLOSE ACCOUNT-FILE
+    CLOSE UPDATED-FILE
+    CLOSE REPORT-FILE
+
+    STOP RUN.
+
+PROCESS-ACCOUNT.
+      *> Monthly interest = balance x annual rate / 12.
+    COMPUTE WS-INTEREST ROUNDED =
+        (ACCT-BALANCE * ACCT-RATE) / 12
+
+    COMPUTE WS-NEW-BALANCE = ACCT-BALANCE + WS-INTEREST
+
+    ADD WS-INTEREST TO WS-TOTAL-INTEREST
+    ADD 1 TO WS-ACCOUNT-COUNT
+
+    MOVE WS-NEW-BALANCE TO WS-BALANCE-DISP
+    MOVE WS-INTEREST    TO WS-INTEREST-DISP
+
+    STRING ACCT-ID          DELIMITED BY SIZE
+           "  "              DELIMITED BY SIZE
+           ACCT-NAME         DELIMITED BY SIZE
+           "  NEW BAL: "     DELIMITED BY SIZE
+           WS-BALANCE-DISP   DELIMITED BY SIZE
+        INTO WS-OUTPUT-LINE
+
+    MOVE WS-OUTPUT-LINE TO UPDATED-RECORD
+    WRITE UPDATED-RECORD
+
+    STRING "Account "        DELIMITED BY SIZE
+           ACCT-ID            DELIMITED BY SIZE
+           " (" DELIMITED BY SIZE
+           ACCT-NAME          DELIMITED BY SIZE
+           ") interest: "     DELIMITED BY SIZE
+           WS-INTEREST-DISP   DELIMITED BY SIZE
+           "  new balance: "  DELIMITED BY SIZE
+           WS-BALANCE-DISP    DELIMITED BY SIZE
+        INTO WS-REPORT-LINE
+
+    MOVE WS-REPORT-LINE TO REPORT-LINE
+    WRITE REPORT-LINE.
+
+WRITE-REPORT-HEADER.
+    MOVE "=== Monthly Interest Batch Report ===" TO REPORT-LINE
+    WRITE REPORT-LINE
+    MOVE SPACES TO REPORT-LINE
+    WRITE REPORT-LINE.
+
+WRITE-REPORT-FOOTER.
+    MOVE WS-ACCOUNT-COUNT TO WS-COUNT-DISP
+    MOVE WS-TOTAL-INTEREST TO WS-TOTAL-DISP
+
+    MOVE SPACES TO REPORT-LINE
+    WRITE REPORT-LINE
+
+    STRING "Total accounts processed: " DELIMITED BY SIZE
+           WS-COUNT-DISP                 DELIMITED BY SIZE
+        INTO WS-REPORT-LINE
+    MOVE WS-REPORT-LINE TO REPORT-LINE
+    WRITE REPORT-LINE
+
+    STRING "Total interest paid out:  " DELIMITED BY SIZE
+           WS-TOTAL-DISP                 DELIMITED BY SIZE
+        INTO WS-REPORT-LINE
+    MOVE WS-REPORT-LINE TO REPORT-LINE
+    WRITE REPORT-LINE.
